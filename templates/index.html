@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+
+{% block content %}
+
+<div class="hero">
+
+    <h1>
+        Data & Machine Learning Dashboard
+    </h1>
+
+    <p class="lead">
+        Upload your dataset, analyze data,
+        visualize charts and train ML models.
+    </p>
+
+</div>
+
+
+<div class="row g-4">
+
+
+    <div class="col-md-3">
+
+        <div class="card stat-card">
+
+            <h6>Total Rows</h6>
+
+            <div class="stat-number text-primary">
+                {{ stats.rows }}
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card stat-card">
+
+            <h6>Total Columns</h6>
+
+            <div class="stat-number text-success">
+                {{ stats.columns }}
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card stat-card">
+
+            <h6>Missing Values</h6>
+
+            <div class="stat-number text-danger">
+                {{ stats.missing }}
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card stat-card">
+
+            <h6>Model Status</h6>
+
+            <div class="stat-number text-warning"
+                 style="font-size:20px">
+
+                {{ stats.model }}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="card mt-5 p-4">
+
+    <h3>
+        📂 Upload Dataset
+    </h3>
+
+    <p class="text-muted">
+        Upload a CSV file to start analysis.
+    </p>
+
+
+    <form
+        action="{{ url_for('upload') }}"
+        method="POST"
+        enctype="multipart/form-data">
+
+
+        <input
+            type="file"
+            name="file"
+            class="form-control mb-3"
+            accept=".csv"
+            required>
+
+
+        <button
+            type="submit"
+            class="btn btn-primary">
+
+            Upload CSV
+
+        </button>
+
+
+    </form>
+
+</div>
+
+
+{% if dataset is not none %}
+
+<div class="card mt-4 p-4">
+
+    <h3>
+        📊 Dataset Preview
+    </h3>
+
+
+    <div class="table-responsive">
+
+        {{ dataset.head(10).to_html(
+            classes="table table-striped table-hover",
+            index=False
+        ) | safe }}
+
+    </div>
+
+</div>
+
+
+<div class="text-center mt-4">
+
+    <a
+        href="{{ url_for('analysis') }}"
+        class="btn btn-primary btn-lg">
+
+        📈 Analyze Dataset
+
+    </a>
+
+</div>
+
+{% endif %}
+
+
+{% endblock %}

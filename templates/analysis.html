@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}
+Data Analysis
+{% endblock %}
+
+
+{% block content %}
+
+<div class="hero">
+
+    <h1>
+        📊 Data Analysis & Visualization
+    </h1>
+
+    <p>
+        Interactive charts and statistical analysis
+        of your dataset.
+    </p>
+
+</div>
+
+
+<h2 class="section-title">
+    📈 Charts & Graphs
+</h2>
+
+
+<div class="row">
+
+
+    {% if histogram_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ histogram_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if bar_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ bar_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if pie_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ pie_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if scatter_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ scatter_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if line_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ line_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    {% if correlation_chart %}
+
+    <div class="col-lg-6">
+
+        <div class="card chart-card">
+
+            {{ correlation_chart | safe }}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+
+<h2 class="section-title">
+    🤖 Train Machine Learning Model
+</h2>
+
+
+<div class="card p-4">
+
+    <form
+        action="{{ url_for('train') }}"
+        method="POST">
+
+
+        <div class="row">
+
+            <div class="col-md-6">
+
+                <label class="form-label">
+                    Target Column
+                </label>
+
+
+                <select
+                    name="target"
+                    class="form-select"
+                    required>
+
+                    <option value="">
+                        Select Target
+                    </option>
+
+
+                    {% for column in columns %}
+
+                    <option value="{{ column }}">
+                        {{ column }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <div class="col-md-6">
+
+                <label class="form-label">
+                    Model
+                </label>
+
+
+                <select
+                    name="model"
+                    class="form-select"
+                    required>
+
+                    <option value="Random Forest">
+                        Random Forest
+                    </option>
+
+                    <option value="Decision Tree">
+                        Decision Tree
+                    </option>
+
+                    <option value="Logistic Regression">
+                        Logistic Regression
+                    </option>
+
+                    <option value="Linear Regression">
+                        Linear Regression
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <button
+            type="submit"
+            class="btn btn-success mt-4">
+
+            🚀 Train Model
+
+        </button>
+
+    </form>
+
+</div>
+
+
+<h2 class="section-title">
+    🔍 Dataset Preview
+</h2>
+
+
+<div class="card p-4">
+
+    <div class="table-responsive">
+
+        {{ preview | safe }}
+
+    </div>
+
+</div>
+
+
+<h2 class="section-title">
+    📋 Column Information
+</h2>
+
+
+<div class="card p-4">
+
+    <div class="table-responsive">
+
+        {{ column_info | safe }}
+
+    </div>
+
+</div>
+
+
+<h2 class="section-title">
+    ⚠️ Missing Values
+</h2>
+
+
+<div class="card p-4">
+
+    <div class="table-responsive">
+
+        {{ missing | safe }}
+
+    </div>
+
+</div>
+
+
+<h2 class="section-title">
+    📐 Descriptive Statistics
+</h2>
+
+
+<div class="card p-4">
+
+    <div class="table-responsive">
+
+        {{ describe | safe }}
+
+    </div>
+
+</div>
+
+
+{% endblock %}
