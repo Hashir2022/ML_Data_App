@@ -1,18 +1,17 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-import os
-import joblib
-import numpy as np
+import streamlit as st
 import pandas as pd
-import plotly
-import plotly.io as pio
+import numpy as np
+import plotly.express as px
+import joblib
+import os
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
-    mean_squared_error,
     mean_absolute_error,
+    mean_squared_error,
     r2_score
 )
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -21,66 +20,63 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
 # =========================================================
-# FLASK APP
+# PAGE CONFIG
 # =========================================================
 
-app = Flask(__name__)
-app.secret_key = os.environ.get(
-    "SECRET_KEY",
-    "ml-data-app-secret-key"
+st.set_page_config(
+    page_title="ML Data Analysis Dashboard",
+    page_icon="📊",
+    layout="wide"
 )
 
 
 # =========================================================
-# FOLDERS
+# SESSION STATE
 # =========================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if "df" not in st.session_state:
+    st.session_state.df = None
 
-UPLOAD_FOLDER = os.path.join(
-    BASE_DIR,
-    "uploads"
-)
+if "model" not in st.session_state:
+    st.session_state.model = None
 
-MODEL_FOLDER = os.path.join(
-    BASE_DIR,
-    "models"
-)
+if "feature_columns" not in st.session_state:
+    st.session_state.feature_columns = []
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(MODEL_FOLDER, exist_ok=True)
+if "target_column" not in st.session_state:
+    st.session_state.target_column = None
 
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+if "task" not in st.session_state:
+    st.session_state.task = None
+
+if "label_encoder" not in st.session_state:
+    st.session_state.label_encoder = None
+
+if "model_name" not in st.session_state:
+    st.session_state.model_name = None
 
 
 # =========================================================
-# HELPER FUNCTIONS
+# FUNCTIONS
 # =========================================================
 
-def load_dataset(filepath):
-    """
-    Load CSV dataset.
-    """
-    return pd.read_csv(filepath)
+def detect_task(y):
+    """Automatically detect Classification or Regression."""
 
+    if y.dtype == "object":
+        return "Classification"
 
-def chart_html(fig):
-    """
-    Convert Plotly figure to HTML.
-    """
-    return pio.to_html(
-        fig,
-        full_html=False,
-        include_plotlyjs="cdn"
-    )
+    if str(y.dtype).startswith("category"):
+        return "Classification"
+
+    if y.nunique() <= 10:
+        return "Classification"
+
+    return "Regression"
 
 
 def prepare_features(df, target_column):
-    """
-    Prepare features for machine learning.
-    Handles missing values and categorical columns.
-    """
+    """Prepare dataset features for ML."""
 
     X = df.drop(
         columns=[target_column]
@@ -92,7 +88,7 @@ def prepare_features(df, target_column):
         how="all"
     )
 
-    # Numerical columns
+    # Numeric columns
     numeric_columns = X.select_dtypes(
         include=np.number
     ).columns
@@ -132,33 +128,13 @@ def prepare_features(df, target_column):
         drop_first=False
     )
 
-    # Convert boolean values
+    # Convert bool to numeric
     X = X.astype(float)
 
     return X
 
 
-def detect_task(y):
-    """
-    Automatically detect classification or regression.
-    """
-
-    if (
-        y.dtype == "object"
-        or str(y.dtype).startswith("category")
-    ):
-        return "Classification"
-
-    if y.nunique() <= 10:
-        return "Classification"
-
-    return "Regression"
-
-
 def create_model(task, model_name):
-    """
-    Create selected ML model.
-    """
 
     if task == "Classification":
 
@@ -167,12 +143,12 @@ def create_model(task, model_name):
                 max_iter=2000
             )
 
-        elif model_name == "Decision Tree":
+        if model_name == "Decision Tree":
             return DecisionTreeClassifier(
                 random_state=42
             )
 
-        elif model_name == "Random Forest":
+        if model_name == "Random Forest":
             return RandomForestClassifier(
                 n_estimators=100,
                 random_state=42
@@ -183,12 +159,12 @@ def create_model(task, model_name):
         if model_name == "Linear Regression":
             return LinearRegression()
 
-        elif model_name == "Decision Tree":
+        if model_name == "Decision Tree":
             return DecisionTreeRegressor(
                 random_state=42
             )
 
-        elif model_name == "Random Forest":
+        if model_name == "Random Forest":
             return RandomForestRegressor(
                 n_estimators=100,
                 random_state=42
@@ -197,745 +173,1050 @@ def create_model(task, model_name):
     return None
 
 
-# =========================================================
-# HOME
-# =========================================================
+def save_model():
 
-@app.route("/")
-def index():
+    package = {
+        "model": st.session_state.model,
+        "feature_columns": st.session_state.feature_columns,
+        "target_column": st.session_state.target_column,
+        "task": st.session_state.task,
+        "label_encoder": st.session_state.label_encoder,
+        "model_name": st.session_state.model_name
+    }
 
-    return render_template(
-        "index.html"
+    os.makedirs(
+        "models",
+        exist_ok=True
+    )
+
+    joblib.dump(
+        package,
+        "models/model.pkl"
     )
 
 
 # =========================================================
-# UPLOAD
+# HEADER
 # =========================================================
 
-@app.route(
-    "/upload",
-    methods=["POST"]
+st.title("📊 ML Data Analysis & Prediction Dashboard")
+
+st.markdown(
+    """
+    Upload your dataset, explore the data,
+    visualize patterns, train machine learning models,
+    and make predictions.
+    """
 )
-def upload():
 
-    if "file" not in request.files:
 
-        flash(
-            "No file selected."
+# =========================================================
+# SIDEBAR
+# =========================================================
+
+st.sidebar.title("⚙️ Navigation")
+
+page = st.sidebar.radio(
+    "Select Section",
+    [
+        "🏠 Dashboard",
+        "📂 Upload Dataset",
+        "🔍 Data Analysis",
+        "🤖 Train Model",
+        "🔮 Prediction"
+    ]
+)
+
+
+# =========================================================
+# DASHBOARD
+# =========================================================
+
+if page == "🏠 Dashboard":
+
+    st.header("🏠 Dashboard")
+
+    if st.session_state.df is None:
+
+        st.info(
+            "No dataset uploaded yet."
         )
 
-        return redirect(
-            url_for("index")
+        st.markdown(
+            """
+            ### Features
+
+            📂 **Upload Dataset**
+
+            Upload CSV datasets.
+
+            🔍 **Data Analysis**
+
+            View dataset information,
+            missing values and statistics.
+
+            📊 **Visualization**
+
+            Create interactive charts.
+
+            🤖 **Machine Learning**
+
+            Train classification or regression models.
+
+            🔮 **Prediction**
+
+            Enter feature values and generate predictions.
+            """
         )
 
-    file = request.files["file"]
+    else:
 
-    if file.filename == "":
+        df = st.session_state.df
 
-        flash(
-            "Please select a CSV file."
+        st.success(
+            "Dataset loaded successfully!"
         )
 
-        return redirect(
-            url_for("index")
-        )
+        col1, col2, col3, col4 = st.columns(4)
 
-    if not file.filename.lower().endswith(".csv"):
-
-        flash(
-            "Only CSV files are supported."
-        )
-
-        return redirect(
-            url_for("index")
-        )
-
-    try:
-
-        filepath = os.path.join(
-            app.config["UPLOAD_FOLDER"],
-            file.filename
-        )
-
-        file.save(filepath)
-
-        df = load_dataset(
-            filepath
-        )
-
-        # Save current dataset information
-        df.to_csv(
-            filepath,
-            index=False
-        )
-
-        flash(
-            "Dataset uploaded successfully!"
-        )
-
-        return redirect(
-            url_for(
-                "analysis",
-                filename=file.filename
+        with col1:
+            st.metric(
+                "Rows",
+                df.shape[0]
             )
-        )
 
-    except Exception as e:
+        with col2:
+            st.metric(
+                "Columns",
+                df.shape[1]
+            )
 
-        flash(
-            f"Error uploading dataset: {e}"
-        )
+        with col3:
+            st.metric(
+                "Missing Values",
+                int(df.isnull().sum().sum())
+            )
 
-        return redirect(
-            url_for("index")
+        with col4:
+            st.metric(
+                "Duplicate Rows",
+                int(df.duplicated().sum())
+            )
+
+        st.subheader("Dataset Preview")
+
+        st.dataframe(
+            df.head(10),
+            use_container_width=True
         )
 
 
 # =========================================================
-# ANALYSIS
+# UPLOAD DATASET
 # =========================================================
 
-@app.route("/analysis")
-def analysis():
+elif page == "📂 Upload Dataset":
 
-    filename = request.args.get(
-        "filename"
+    st.header("📂 Upload Dataset")
+
+    uploaded_file = st.file_uploader(
+        "Choose a CSV file",
+        type=["csv"]
     )
 
-    if not filename:
+    if uploaded_file is not None:
 
-        flash(
-            "No dataset selected."
-        )
-
-        return redirect(
-            url_for("index")
-        )
-
-    filepath = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        filename
-    )
-
-    if not os.path.exists(filepath):
-
-        flash(
-            "Dataset not found."
-        )
-
-        return redirect(
-            url_for("index")
-        )
-
-    try:
-
-        df = load_dataset(
-            filepath
-        )
-
-        # Basic information
-        rows = len(df)
-        columns = len(df.columns)
-
-        missing_values = int(
-            df.isnull().sum().sum()
-        )
-
-        duplicate_rows = int(
-            df.duplicated().sum()
-        )
-
-        # Preview
-        preview = df.head(10)
-
-        # Dataset info
-        info_data = []
-
-        for column in df.columns:
-
-            info_data.append({
-                "Column": column,
-                "Data Type": str(
-                    df[column].dtype
-                ),
-                "Missing": int(
-                    df[column].isnull().sum()
-                ),
-                "Unique": int(
-                    df[column].nunique()
-                )
-            })
-
-        info_df = pd.DataFrame(
-            info_data
-        )
-
-        # Statistics
         try:
 
-            description = df.describe(
+            df = pd.read_csv(
+                uploaded_file
+            )
+
+            st.session_state.df = df
+
+            # Reset model
+            st.session_state.model = None
+            st.session_state.feature_columns = []
+            st.session_state.target_column = None
+            st.session_state.task = None
+            st.session_state.label_encoder = None
+            st.session_state.model_name = None
+
+            st.success(
+                "Dataset uploaded successfully!"
+            )
+
+            st.subheader("Preview")
+
+            st.dataframe(
+                df.head(20),
+                use_container_width=True
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "Rows",
+                    df.shape[0]
+                )
+
+            with col2:
+                st.metric(
+                    "Columns",
+                    df.shape[1]
+                )
+
+            with col3:
+                st.metric(
+                    "Missing Values",
+                    int(df.isnull().sum().sum())
+                )
+
+        except Exception as e:
+
+            st.error(
+                f"Unable to read CSV: {e}"
+            )
+
+
+# =========================================================
+# DATA ANALYSIS
+# =========================================================
+
+elif page == "🔍 Data Analysis":
+
+    st.header("🔍 Data Analysis")
+
+    if st.session_state.df is None:
+
+        st.warning(
+            "Please upload a dataset first."
+        )
+
+    else:
+
+        df = st.session_state.df
+
+        # -------------------------------------------------
+        # OVERVIEW
+        # -------------------------------------------------
+
+        st.subheader("📋 Dataset Overview")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric(
+                "Rows",
+                df.shape[0]
+            )
+
+        with col2:
+            st.metric(
+                "Columns",
+                df.shape[1]
+            )
+
+        with col3:
+            st.metric(
+                "Missing",
+                int(df.isnull().sum().sum())
+            )
+
+        with col4:
+            st.metric(
+                "Duplicates",
+                int(df.duplicated().sum())
+            )
+
+        # -------------------------------------------------
+        # DATA PREVIEW
+        # -------------------------------------------------
+
+        st.subheader("👀 Dataset Preview")
+
+        st.dataframe(
+            df,
+            use_container_width=True
+        )
+
+        # -------------------------------------------------
+        # COLUMN INFORMATION
+        # -------------------------------------------------
+
+        st.subheader("📑 Column Information")
+
+        info_df = pd.DataFrame({
+            "Column": df.columns,
+            "Data Type": [
+                str(dtype)
+                for dtype in df.dtypes
+            ],
+            "Missing": [
+                int(df[col].isnull().sum())
+                for col in df.columns
+            ],
+            "Unique": [
+                int(df[col].nunique())
+                for col in df.columns
+            ]
+        })
+
+        st.dataframe(
+            info_df,
+            use_container_width=True
+        )
+
+        # -------------------------------------------------
+        # STATISTICS
+        # -------------------------------------------------
+
+        st.subheader("📊 Statistical Summary")
+
+        st.dataframe(
+            df.describe(
                 include="all"
-            ).fillna("")
-
-        except Exception:
-
-            description = pd.DataFrame()
-
-        return render_template(
-            "analysis.html",
-            filename=filename,
-            data=preview.to_html(
-                classes="table table-striped table-bordered",
-                index=False
-            ),
-            info=info_df.to_html(
-                classes="table table-striped table-bordered",
-                index=False
-            ),
-            description=description.to_html(
-                classes="table table-striped table-bordered"
-            ),
-            rows=rows,
-            columns=columns,
-            missing_values=missing_values,
-            duplicate_rows=duplicate_rows
+            ).T,
+            use_container_width=True
         )
 
-    except Exception as e:
+        # -------------------------------------------------
+        # MISSING VALUES
+        # -------------------------------------------------
 
-        flash(
-            f"Error analyzing dataset: {e}"
+        st.subheader("❓ Missing Values")
+
+        missing_df = pd.DataFrame({
+            "Column": df.columns,
+            "Missing Values": [
+                int(df[col].isnull().sum())
+                for col in df.columns
+            ],
+            "Percentage": [
+                round(
+                    df[col].isnull().mean() * 100,
+                    2
+                )
+                for col in df.columns
+            ]
+        })
+
+        st.dataframe(
+            missing_df,
+            use_container_width=True
         )
 
-        return redirect(
-            url_for("index")
+        # -------------------------------------------------
+        # VISUALIZATION
+        # -------------------------------------------------
+
+        st.subheader("📈 Data Visualization")
+
+        chart_type = st.selectbox(
+            "Choose Visualization",
+            [
+                "Histogram",
+                "Bar Chart",
+                "Scatter Plot",
+                "Line Chart",
+                "Pie Chart",
+                "Correlation Heatmap"
+            ]
         )
+
+        numeric_columns = df.select_dtypes(
+            include=np.number
+        ).columns.tolist()
+
+        all_columns = df.columns.tolist()
+
+        # Histogram
+        if chart_type == "Histogram":
+
+            if len(numeric_columns) == 0:
+
+                st.warning(
+                    "No numeric columns available."
+                )
+
+            else:
+
+                column = st.selectbox(
+                    "Select Column",
+                    numeric_columns
+                )
+
+                fig = px.histogram(
+                    df,
+                    x=column,
+                    title=f"Distribution of {column}"
+                )
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
+
+        # Bar Chart
+        elif chart_type == "Bar Chart":
+
+            column = st.selectbox(
+                "Select Column",
+                all_columns
+            )
+
+            counts = (
+                df[column]
+                .astype(str)
+                .value_counts()
+                .head(20)
+                .reset_index()
+            )
+
+            counts.columns = [
+                "Value",
+                "Count"
+            ]
+
+            fig = px.bar(
+                counts,
+                x="Value",
+                y="Count",
+                title=f"Bar Chart - {column}"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+        # Scatter
+        elif chart_type == "Scatter Plot":
+
+            if len(numeric_columns) < 2:
+
+                st.warning(
+                    "At least two numeric columns are required."
+                )
+
+            else:
+
+                x_column = st.selectbox(
+                    "X Axis",
+                    numeric_columns
+                )
+
+                y_column = st.selectbox(
+                    "Y Axis",
+                    numeric_columns,
+                    index=1
+                )
+
+                fig = px.scatter(
+                    df,
+                    x=x_column,
+                    y=y_column,
+                    title=f"{x_column} vs {y_column}"
+                )
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
+
+        # Line Chart
+        elif chart_type == "Line Chart":
+
+            if not numeric_columns:
+
+                st.warning(
+                    "No numeric columns available."
+                )
+
+            else:
+
+                column = st.selectbox(
+                    "Select Column",
+                    numeric_columns
+                )
+
+                fig = px.line(
+                    df,
+                    y=column,
+                    title=f"Line Chart - {column}"
+                )
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
+
+        # Pie Chart
+        elif chart_type == "Pie Chart":
+
+            column = st.selectbox(
+                "Select Column",
+                all_columns
+            )
+
+            counts = (
+                df[column]
+                .astype(str)
+                .value_counts()
+                .head(10)
+            )
+
+            fig = px.pie(
+                values=counts.values,
+                names=counts.index,
+                title=f"Pie Chart - {column}"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+        # Correlation
+        elif chart_type == "Correlation Heatmap":
+
+            if len(numeric_columns) < 2:
+
+                st.warning(
+                    "At least two numeric columns are required."
+                )
+
+            else:
+
+                correlation = df[
+                    numeric_columns
+                ].corr()
+
+                fig = px.imshow(
+                    correlation,
+                    text_auto=True,
+                    title="Correlation Heatmap"
+                )
+
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
 
 
 # =========================================================
 # TRAIN MODEL
 # =========================================================
 
-@app.route(
-    "/train",
-    methods=["POST"]
-)
-def train():
+elif page == "🤖 Train Model":
 
-    filename = request.form.get(
-        "filename"
-    )
+    st.header("🤖 Train Machine Learning Model")
 
-    target_column = request.form.get(
-        "target_column"
-    )
+    if st.session_state.df is None:
 
-    model_name = request.form.get(
-        "model"
-    )
-
-    test_size = request.form.get(
-        "test_size",
-        "0.2"
-    )
-
-    if not filename or not target_column:
-
-        flash(
-            "Dataset and target column are required."
+        st.warning(
+            "Please upload a dataset first."
         )
 
-        return redirect(
-            url_for("index")
+    else:
+
+        df = st.session_state.df.copy()
+
+        # Target
+        target_column = st.selectbox(
+            "🎯 Select Target Column",
+            df.columns
         )
 
-    filepath = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        filename
-    )
-
-    if not os.path.exists(filepath):
-
-        flash(
-            "Dataset not found."
-        )
-
-        return redirect(
-            url_for("index")
-        )
-
-    try:
-
-        df = load_dataset(
-            filepath
-        )
-
-        if target_column not in df.columns:
-
-            flash(
-                "Target column not found."
-            )
-
-            return redirect(
-                url_for(
-                    "analysis",
-                    filename=filename
-                )
-            )
-
-        # Detect task
-        task = detect_task(
+        detected_task = detect_task(
             df[target_column]
         )
 
-        # Prepare X
-        X = prepare_features(
-            df,
-            target_column
+        st.info(
+            f"Automatically detected task: **{detected_task}**"
         )
 
-        # Target
-        y = df[target_column].copy()
+        task = st.radio(
+            "Machine Learning Task",
+            [
+                "Classification",
+                "Regression"
+            ],
+            index=(
+                0
+                if detected_task == "Classification"
+                else 1
+            )
+        )
 
-        # Remove missing target rows
-        valid_rows = ~y.isna()
-
-        X = X.loc[
-            valid_rows
-        ]
-
-        y = y.loc[
-            valid_rows
-        ]
-
-        # Convert target
-        label_encoder = None
-
+        # Model selection
         if task == "Classification":
 
-            label_encoder = LabelEncoder()
-
-            y = label_encoder.fit_transform(
-                y.astype(str)
+            model_name = st.selectbox(
+                "Select Model",
+                [
+                    "Logistic Regression",
+                    "Decision Tree",
+                    "Random Forest"
+                ]
             )
 
         else:
 
-            y = pd.to_numeric(
-                y,
-                errors="coerce"
+            model_name = st.selectbox(
+                "Select Model",
+                [
+                    "Linear Regression",
+                    "Decision Tree",
+                    "Random Forest"
+                ]
             )
-
-            valid_target = ~pd.isna(y)
-
-            X = X.loc[
-                valid_target
-            ]
-
-            y = y.loc[
-                valid_target
-            ]
 
         # Test size
-        try:
+        test_size = st.slider(
+            "Test Size",
+            min_value=0.10,
+            max_value=0.40,
+            value=0.20,
+            step=0.05
+        )
 
-            test_size = float(
-                test_size
-            )
+        if st.button(
+            "🚀 Train Model",
+            type="primary"
+        ):
 
-        except Exception:
+            try:
 
-            test_size = 0.2
-
-        # Train/test split
-        if task == "Classification":
-
-            # Stratification only when possible
-            unique_classes, class_counts = np.unique(
-                y,
-                return_counts=True
-            )
-
-            if (
-                len(unique_classes) > 1
-                and class_counts.min() >= 2
-            ):
-
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X,
-                    y,
-                    test_size=test_size,
-                    random_state=42,
-                    stratify=y
+                # Features
+                X = prepare_features(
+                    df,
+                    target_column
                 )
 
-            else:
+                # Target
+                y = df[target_column].copy()
 
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X,
-                    y,
-                    test_size=test_size,
-                    random_state=42
-                )
+                # Remove missing targets
+                valid = ~y.isna()
 
-        else:
+                X = X.loc[valid]
+                y = y.loc[valid]
 
-            X_train, X_test, y_train, y_test = train_test_split(
-                X,
-                y,
-                test_size=test_size,
-                random_state=42
-            )
+                if X.shape[1] == 0:
 
-        # Create model
-        model = create_model(
-            task,
-            model_name
-        )
-
-        if model is None:
-
-            flash(
-                "Invalid model selected."
-            )
-
-            return redirect(
-                url_for(
-                    "analysis",
-                    filename=filename
-                )
-            )
-
-        # Train
-        model.fit(
-            X_train,
-            y_train
-        )
-
-        # Predict
-        predictions = model.predict(
-            X_test
-        )
-
-        # Save model package
-        model_package = {
-            "model": model,
-            "feature_columns": X.columns.tolist(),
-            "target_column": target_column,
-            "task": task,
-            "label_encoder": label_encoder
-        }
-
-        model_path = os.path.join(
-            MODEL_FOLDER,
-            "model.pkl"
-        )
-
-        joblib.dump(
-            model_package,
-            model_path
-        )
-
-        # Classification metrics
-        if task == "Classification":
-
-            accuracy = accuracy_score(
-                y_test,
-                predictions
-            )
-
-            report = classification_report(
-                y_test,
-                predictions,
-                output_dict=True,
-                zero_division=0
-            )
-
-            report_df = pd.DataFrame(
-                report
-            ).transpose()
-
-            # Convert prediction labels
-            if label_encoder is not None:
-
-                try:
-
-                    actual_labels = label_encoder.inverse_transform(
-                        y_test.astype(int)
+                    st.error(
+                        "No usable feature columns found."
                     )
 
-                    predicted_labels = label_encoder.inverse_transform(
-                        predictions.astype(int)
+                    st.stop()
+
+                # -------------------------------------------------
+                # CLASSIFICATION
+                # -------------------------------------------------
+
+                if task == "Classification":
+
+                    label_encoder = LabelEncoder()
+
+                    y_encoded = label_encoder.fit_transform(
+                        y.astype(str)
                     )
 
-                except Exception:
+                    unique_classes, counts = np.unique(
+                        y_encoded,
+                        return_counts=True
+                    )
 
-                    actual_labels = y_test
-                    predicted_labels = predictions
+                    if (
+                        len(unique_classes) > 1
+                        and counts.min() >= 2
+                    ):
 
-            else:
+                        X_train, X_test, y_train, y_test = train_test_split(
+                            X,
+                            y_encoded,
+                            test_size=test_size,
+                            random_state=42,
+                            stratify=y_encoded
+                        )
 
-                actual_labels = y_test
-                predicted_labels = predictions
+                    else:
 
-            result_df = pd.DataFrame({
-                "Actual": actual_labels,
-                "Predicted": predicted_labels
-            })
+                        X_train, X_test, y_train, y_test = train_test_split(
+                            X,
+                            y_encoded,
+                            test_size=test_size,
+                            random_state=42
+                        )
 
-            return render_template(
-                "result.html",
-                task=task,
-                model=model_name,
-                accuracy=round(
-                    accuracy * 100,
-                    2
-                ),
-                report=report_df.to_html(
-                    classes="table table-striped table-bordered"
-                ),
-                results=result_df.to_html(
-                    classes="table table-striped table-bordered",
-                    index=False
-                ),
-                target_column=target_column,
-                filename=filename
-            )
+                    model = create_model(
+                        task,
+                        model_name
+                    )
 
-        # Regression metrics
-        else:
+                    model.fit(
+                        X_train,
+                        y_train
+                    )
 
-            mae = mean_absolute_error(
-                y_test,
-                predictions
-            )
+                    predictions = model.predict(
+                        X_test
+                    )
 
-            mse = mean_squared_error(
-                y_test,
-                predictions
-            )
+                    accuracy = accuracy_score(
+                        y_test,
+                        predictions
+                    )
 
-            rmse = np.sqrt(
-                mse
-            )
+                    st.session_state.model = model
+                    st.session_state.feature_columns = X.columns.tolist()
+                    st.session_state.target_column = target_column
+                    st.session_state.task = task
+                    st.session_state.label_encoder = label_encoder
+                    st.session_state.model_name = model_name
 
-            r2 = r2_score(
-                y_test,
-                predictions
-            )
+                    save_model()
 
-            result_df = pd.DataFrame({
-                "Actual": y_test,
-                "Predicted": predictions
-            })
+                    st.success(
+                        "✅ Model trained successfully!"
+                    )
 
-            return render_template(
-                "result.html",
-                task=task,
-                model=model_name,
-                mae=round(
-                    mae,
-                    4
-                ),
-                mse=round(
-                    mse,
-                    4
-                ),
-                rmse=round(
-                    rmse,
-                    4
-                ),
-                r2=round(
-                    r2,
-                    4
-                ),
-                results=result_df.to_html(
-                    classes="table table-striped table-bordered",
-                    index=False
-                ),
-                target_column=target_column,
-                filename=filename
-            )
+                    col1, col2 = st.columns(2)
 
-    except Exception as e:
+                    with col1:
 
-        flash(
-            f"Model training failed: {e}"
-        )
+                        st.metric(
+                            "Accuracy",
+                            f"{accuracy * 100:.2f}%"
+                        )
 
-        return redirect(
-            url_for(
-                "analysis",
-                filename=filename
-            )
-        )
+                    with col2:
+
+                        st.metric(
+                            "Training Rows",
+                            len(X_train)
+                        )
+
+                    # Classification report
+                    st.subheader(
+                        "📄 Classification Report"
+                    )
+
+                    report = classification_report(
+                        y_test,
+                        predictions,
+                        target_names=label_encoder.classes_,
+                        output_dict=True,
+                        zero_division=0
+                    )
+
+                    report_df = pd.DataFrame(
+                        report
+                    ).transpose()
+
+                    st.dataframe(
+                        report_df,
+                        use_container_width=True
+                    )
+
+                    # Actual vs predicted
+                    actual = label_encoder.inverse_transform(
+                        y_test
+                    )
+
+                    predicted = label_encoder.inverse_transform(
+                        predictions
+                    )
+
+                    results_df = pd.DataFrame({
+                        "Actual": actual,
+                        "Predicted": predicted
+                    })
+
+                    st.subheader(
+                        "Actual vs Predicted"
+                    )
+
+                    st.dataframe(
+                        results_df,
+                        use_container_width=True
+                    )
+
+                # -------------------------------------------------
+                # REGRESSION
+                # -------------------------------------------------
+
+                else:
+
+                    y = pd.to_numeric(
+                        y,
+                        errors="coerce"
+                    )
+
+                    valid = ~y.isna()
+
+                    X = X.loc[valid]
+                    y = y.loc[valid]
+
+                    X_train, X_test, y_train, y_test = train_test_split(
+                        X,
+                        y,
+                        test_size=test_size,
+                        random_state=42
+                    )
+
+                    model = create_model(
+                        task,
+                        model_name
+                    )
+
+                    model.fit(
+                        X_train,
+                        y_train
+                    )
+
+                    predictions = model.predict(
+                        X_test
+                    )
+
+                    mae = mean_absolute_error(
+                        y_test,
+                        predictions
+                    )
+
+                    mse = mean_squared_error(
+                        y_test,
+                        predictions
+                    )
+
+                    rmse = np.sqrt(
+                        mse
+                    )
+
+                    r2 = r2_score(
+                        y_test,
+                        predictions
+                    )
+
+                    st.session_state.model = model
+                    st.session_state.feature_columns = X.columns.tolist()
+                    st.session_state.target_column = target_column
+                    st.session_state.task = task
+                    st.session_state.label_encoder = None
+                    st.session_state.model_name = model_name
+
+                    save_model()
+
+                    st.success(
+                        "✅ Regression model trained successfully!"
+                    )
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    with col1:
+                        st.metric(
+                            "MAE",
+                            f"{mae:.4f}"
+                        )
+
+                    with col2:
+                        st.metric(
+                            "MSE",
+                            f"{mse:.4f}"
+                        )
+
+                    with col3:
+                        st.metric(
+                            "RMSE",
+                            f"{rmse:.4f}"
+                        )
+
+                    with col4:
+                        st.metric(
+                            "R² Score",
+                            f"{r2:.4f}"
+                        )
+
+                    results_df = pd.DataFrame({
+                        "Actual": y_test.values,
+                        "Predicted": predictions
+                    })
+
+                    st.subheader(
+                        "Actual vs Predicted"
+                    )
+
+                    st.dataframe(
+                        results_df,
+                        use_container_width=True
+                    )
 
 
 # =========================================================
 # PREDICTION
 # =========================================================
 
-@app.route(
-    "/predict",
-    methods=["GET", "POST"]
-)
-def predict():
+elif page == "🔮 Prediction":
 
-    model_path = os.path.join(
-        MODEL_FOLDER,
-        "model.pkl"
-    )
+    st.header("🔮 Make Prediction")
 
-    if not os.path.exists(model_path):
+    if st.session_state.model is None:
 
-        flash(
+        st.warning(
             "Please train a model first."
         )
 
-        return redirect(
-            url_for("index")
+    else:
+
+        model = st.session_state.model
+        feature_columns = st.session_state.feature_columns
+        target_column = st.session_state.target_column
+        task = st.session_state.task
+
+        st.success(
+            f"Model: **{st.session_state.model_name}**"
         )
 
-    try:
-
-        model_package = joblib.load(
-            model_path
+        st.write(
+            f"Target: **{target_column}**"
         )
 
-        model = model_package["model"]
-        feature_columns = model_package["feature_columns"]
-        task = model_package["task"]
-        target_column = model_package["target_column"]
-        label_encoder = model_package.get(
-            "label_encoder"
+        st.subheader(
+            "Enter Feature Values"
         )
 
-        if request.method == "GET":
+        df = st.session_state.df
 
-            return render_template(
-                "predict.html",
-                feature_columns=feature_columns,
-                task=task,
-                target_column=target_column
-            )
-
-        # POST prediction
         input_data = {}
 
-        for column in feature_columns:
+        original_features = [
+            column
+            for column in df.columns
+            if column != target_column
+        ]
 
-            value = request.form.get(
-                column
-            )
+        for column in original_features:
 
-            input_data[column] = value
+            if pd.api.types.is_numeric_dtype(
+                df[column]
+            ):
 
-        input_df = pd.DataFrame(
-            [input_data]
-        )
+                values = pd.to_numeric(
+                    df[column],
+                    errors="coerce"
+                ).dropna()
 
-        # Convert numeric-looking values
-        for column in input_df.columns:
+                if len(values) > 0:
+                    default_value = float(
+                        values.median()
+                    )
+                else:
+                    default_value = 0.0
 
-            try:
-
-                input_df[column] = pd.to_numeric(
-                    input_df[column]
+                input_data[column] = st.number_input(
+                    column,
+                    value=default_value
                 )
-
-            except Exception:
-
-                pass
-
-        # One-hot encoding
-        input_encoded = pd.get_dummies(
-            input_df,
-            drop_first=False
-        )
-
-        # Match training columns
-        input_encoded = input_encoded.reindex(
-            columns=feature_columns,
-            fill_value=0
-        )
-
-        input_encoded = input_encoded.astype(
-            float
-        )
-
-        prediction = model.predict(
-            input_encoded
-        )
-
-        if task == "Classification":
-
-            if label_encoder is not None:
-
-                try:
-
-                    prediction_value = label_encoder.inverse_transform(
-                        prediction.astype(int)
-                    )[0]
-
-                except Exception:
-
-                    prediction_value = prediction[0]
 
             else:
 
-                prediction_value = prediction[0]
+                values = (
+                    df[column]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                    .tolist()
+                )
 
-        else:
+                if len(values) > 0:
 
-            prediction_value = prediction[0]
+                    input_data[column] = st.selectbox(
+                        column,
+                        values
+                    )
 
-        return render_template(
-            "result.html",
-            prediction=prediction_value,
-            task=task,
-            target_column=target_column
-        )
+                else:
 
-    except Exception as e:
+                    input_data[column] = st.text_input(
+                        column
+                    )
 
-        flash(
-            f"Prediction failed: {e}"
-        )
+        if st.button(
+            "🔮 Predict",
+            type="primary"
+        ):
 
-        return redirect(
-            url_for("index")
-        )
+            try:
+
+                input_df = pd.DataFrame(
+                    [input_data]
+                )
+
+                input_encoded = pd.get_dummies(
+                    input_df,
+                    drop_first=False
+                )
+
+                input_encoded = input_encoded.reindex(
+                    columns=feature_columns,
+                    fill_value=0
+                )
+
+                input_encoded = input_encoded.astype(
+                    float
+                )
+
+                prediction = model.predict(
+                    input_encoded
+                )
+
+                if task == "Classification":
+
+                    encoder = st.session_state.label_encoder
+
+                    if encoder is not None:
+
+                        result = encoder.inverse_transform(
+                            prediction.astype(int)
+                        )[0]
+
+                    else:
+
+                        result = prediction[0]
+
+                    st.success(
+                        f"🎯 Prediction: **{result}**"
+                    )
+
+                else:
+
+                    result = float(
+                        prediction[0]
+                    )
+
+                    st.success(
+                        f"🎯 Predicted Value: **{result:.4f}**"
+                    )
+
+            except Exception as e:
+
+                st.error(
+                    f"Prediction failed: {e}"
+                )
 
 
 # =========================================================
-# HEALTH CHECK
+# FOOTER
 # =========================================================
 
-@app.route("/health")
-def health():
+st.sidebar.markdown("---")
 
-    return {
-        "status": "ok",
-        "application": "ML Data Analysis Dashboard"
-    }
+st.sidebar.caption(
+    "ML Data Analysis Dashboard"
+)
 
-
-# =========================================================
-# RUN APP
-# =========================================================
-
-if __name__ == "__main__":
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            5000
-        )
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+st.sidebar.caption(
+    "Built with Python • Streamlit • Pandas • Scikit-learn • Plotly"
+)
