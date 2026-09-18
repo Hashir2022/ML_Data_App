@@ -8,15 +8,27 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import (
+    LabelEncoder,
+    OneHotEncoder,
+    StandardScaler,
+)
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.linear_model import (
+    LogisticRegression,
+    LinearRegression,
+)
+from sklearn.tree import (
+    DecisionTreeClassifier,
+    DecisionTreeRegressor,
+)
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 
 from sklearn.metrics import (
     accuracy_score,
@@ -28,106 +40,202 @@ from sklearn.metrics import (
 )
 
 
-# =========================================================
-# PAGE CONFIGURATION
-# =========================================================
+# ============================================================
+# PAGE CONFIG
+# ============================================================
 
 st.set_page_config(
-    page_title="ML Data App",
+    page_title="ML Data Intelligence",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
-# =========================================================
-# CUSTOM CSS
-# =========================================================
+# ============================================================
+# PROFESSIONAL UI STYLE
+# ============================================================
 
 st.markdown(
     """
     <style>
-    .main-title {
-        font-size: 42px;
-        font-weight: 700;
-        margin-bottom: 5px;
+
+    /* Main background */
+    .stApp {
+        background: #f6f8fc;
     }
 
-    .sub-title {
-        font-size: 18px;
-        color: #666;
+    /* Remove default top spacing */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: #111827;
+        border-right: 1px solid #1f2937;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #f9fafb !important;
+    }
+
+    /* Sidebar radio */
+    section[data-testid="stSidebar"]
+    div[role="radiogroup"] label {
+        background: transparent;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 4px;
+    }
+
+    section[data-testid="stSidebar"]
+    div[role="radiogroup"] label:hover {
+        background: #1f2937;
+    }
+
+    /* Main heading */
+    .hero-title {
+        font-size: 38px;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 3px;
+    }
+
+    .hero-subtitle {
+        font-size: 16px;
+        color: #6b7280;
         margin-bottom: 25px;
     }
 
-    .metric-card {
+    /* Cards */
+    .dashboard-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
         padding: 20px;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+        min-height: 120px;
+    }
+
+    .card-label {
+        color: #6b7280;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .card-value {
+        color: #111827;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    .card-icon {
+        font-size: 25px;
+        margin-bottom: 8px;
+    }
+
+    /* Section */
+    .section-title {
+        color: #111827;
+        font-size: 22px;
+        font-weight: 750;
+        margin-top: 25px;
+        margin-bottom: 12px;
+    }
+
+    /* Info cards */
+    .info-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 22px;
+        height: 100%;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+    }
+
+    .info-card h3 {
+        color: #111827;
+        margin-bottom: 8px;
+    }
+
+    .info-card p {
+        color: #6b7280;
+        line-height: 1.6;
+    }
+
+    /* Upload box */
+    [data-testid="stFileUploader"] {
+        background: white;
+        border: 2px dashed #cbd5e1;
+        border-radius: 14px;
+        padding: 10px;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        border-radius: 9px;
+        font-weight: 650;
+        min-height: 42px;
+    }
+
+    /* Metric */
+    [data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 15px;
         border-radius: 12px;
-        border: 1px solid #ddd;
-        background-color: #fafafa;
+    }
+
+    /* Dataframe */
+    [data-testid="stDataFrame"] {
+        border-radius: 10px;
+    }
+
+    /* Footer */
+    .footer {
         text-align: center;
+        color: #9ca3af;
+        font-size: 13px;
+        padding: 20px 0;
     }
 
-    .success-box {
-        padding: 15px;
-        border-radius: 10px;
-        background-color: #e8f5e9;
-        border: 1px solid #81c784;
-    }
-
-    .info-box {
-        padding: 15px;
-        border-radius: 10px;
-        background-color: #e3f2fd;
-        border: 1px solid #64b5f6;
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# =========================================================
+# ============================================================
 # SESSION STATE
-# =========================================================
+# ============================================================
 
-if "df" not in st.session_state:
-    st.session_state.df = None
+defaults = {
+    "df": None,
+    "model": None,
+    "model_pipeline": None,
+    "target_column": None,
+    "feature_columns": [],
+    "task_type": None,
+    "model_name": None,
+    "label_encoder": None,
+    "training_results": None,
+    "accuracy": None,
+    "metrics": None,
+}
 
-if "model" not in st.session_state:
-    st.session_state.model = None
-
-if "model_pipeline" not in st.session_state:
-    st.session_state.model_pipeline = None
-
-if "target_column" not in st.session_state:
-    st.session_state.target_column = None
-
-if "feature_columns" not in st.session_state:
-    st.session_state.feature_columns = []
-
-if "task_type" not in st.session_state:
-    st.session_state.task_type = None
-
-if "model_name" not in st.session_state:
-    st.session_state.model_name = None
-
-if "label_encoder" not in st.session_state:
-    st.session_state.label_encoder = None
-
-if "training_results" not in st.session_state:
-    st.session_state.training_results = None
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
-# =========================================================
+# ============================================================
 # HELPER FUNCTIONS
-# =========================================================
+# ============================================================
 
 def detect_task(y):
-    """
-    Automatically detect whether the problem is
-    classification or regression.
-    """
-
     if y.dtype == "object":
         return "Classification"
 
@@ -135,56 +243,46 @@ def detect_task(y):
         return "Classification"
 
     if pd.api.types.is_integer_dtype(y):
-        unique_values = y.nunique()
-
-        if unique_values <= 20:
+        if y.nunique() <= 20:
             return "Classification"
-
         return "Regression"
 
     if pd.api.types.is_float_dtype(y):
-        unique_values = y.nunique()
-
-        if unique_values <= 10:
+        if y.nunique() <= 10:
             return "Classification"
-
         return "Regression"
 
     return "Classification"
 
 
 def prepare_target(y):
-    """
-    Prepare target column for machine learning.
-    """
-
     encoder = None
 
-    if y.dtype == "object" or pd.api.types.is_bool_dtype(y):
+    if (
+        y.dtype == "object"
+        or pd.api.types.is_bool_dtype(y)
+    ):
         encoder = LabelEncoder()
-        y_encoded = encoder.fit_transform(y.astype(str))
-
+        y_encoded = encoder.fit_transform(
+            y.astype(str)
+        )
         return y_encoded, encoder
 
     return y, encoder
 
 
 def create_preprocessor(X):
-    """
-    Create preprocessing pipeline for numerical
-    and categorical features.
-    """
 
-    numerical_columns = X.select_dtypes(
-        include=["int64", "int32", "float64", "float32"]
+    numeric_columns = X.select_dtypes(
+        include=np.number
     ).columns.tolist()
 
     categorical_columns = X.select_dtypes(
         include=["object", "category", "bool"]
     ).columns.tolist()
 
-    numerical_pipeline = Pipeline(
-        steps=[
+    numeric_pipeline = Pipeline(
+        [
             (
                 "imputer",
                 SimpleImputer(strategy="median"),
@@ -197,10 +295,12 @@ def create_preprocessor(X):
     )
 
     categorical_pipeline = Pipeline(
-        steps=[
+        [
             (
                 "imputer",
-                SimpleImputer(strategy="most_frequent"),
+                SimpleImputer(
+                    strategy="most_frequent"
+                ),
             ),
             (
                 "onehot",
@@ -213,12 +313,12 @@ def create_preprocessor(X):
 
     transformers = []
 
-    if numerical_columns:
+    if numeric_columns:
         transformers.append(
             (
-                "numerical",
-                numerical_pipeline,
-                numerical_columns,
+                "numeric",
+                numeric_pipeline,
+                numeric_columns,
             )
         )
 
@@ -236,12 +336,9 @@ def create_preprocessor(X):
     )
 
 
-def get_model(task_type, model_name):
-    """
-    Return selected machine learning model.
-    """
+def get_model(task, model_name):
 
-    if task_type == "Classification":
+    if task == "Classification":
 
         if model_name == "Logistic Regression":
             return LogisticRegression(
@@ -255,7 +352,7 @@ def get_model(task_type, model_name):
 
         if model_name == "Random Forest":
             return RandomForestClassifier(
-                n_estimators=100,
+                n_estimators=150,
                 random_state=42
             )
 
@@ -271,192 +368,321 @@ def get_model(task_type, model_name):
 
         if model_name == "Random Forest":
             return RandomForestRegressor(
-                n_estimators=100,
+                n_estimators=150,
                 random_state=42
             )
 
     return None
 
 
-def dataframe_download(df):
-    """
-    Convert dataframe to CSV bytes.
-    """
+def reset_model():
 
-    return df.to_csv(index=False).encode("utf-8")
+    st.session_state.model = None
+    st.session_state.model_pipeline = None
+    st.session_state.target_column = None
+    st.session_state.feature_columns = []
+    st.session_state.task_type = None
+    st.session_state.model_name = None
+    st.session_state.label_encoder = None
+    st.session_state.training_results = None
+    st.session_state.accuracy = None
+    st.session_state.metrics = None
 
 
-# =========================================================
+# ============================================================
 # SIDEBAR
-# =========================================================
+# ============================================================
 
-st.sidebar.title("🤖 ML Data App")
-
-st.sidebar.markdown(
-    "### Navigation"
-)
-
-page = st.sidebar.radio(
-    "Select Page",
-    [
-        "🏠 Dashboard",
-        "📂 Upload Dataset",
-        "📊 Data Analysis",
-        "🤖 Train Model",
-        "🔮 Prediction",
-    ],
-)
-
-st.sidebar.markdown("---")
-
-st.sidebar.info(
-    """
-    **ML Data App**
-
-    Upload your dataset, analyze the data,
-    train a machine learning model and
-    make predictions.
-    """
-)
-
-
-# =========================================================
-# DASHBOARD
-# =========================================================
-
-if page == "🏠 Dashboard":
+with st.sidebar:
 
     st.markdown(
-        '<div class="main-title">🤖 ML Data App</div>',
+        """
+        <div style="padding:10px 5px 25px 5px;">
+            <div style="font-size:32px;">🤖</div>
+            <div style="
+                font-size:22px;
+                font-weight:800;
+                color:white;
+                margin-top:5px;">
+                ML Data App
+            </div>
+            <div style="
+                font-size:12px;
+                color:#9ca3af;
+                margin-top:4px;">
+                Data Intelligence Platform
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<div class="sub-title">'
-        "Machine Learning Data Analysis & Prediction Dashboard"
-        "</div>",
-        unsafe_allow_html=True,
+    st.markdown("### Navigation")
+
+    page = st.radio(
+        "",
+        [
+            "🏠 Dashboard",
+            "📂 Upload Dataset",
+            "📊 Data Analysis",
+            "🤖 Train Model",
+            "🔮 Prediction",
+        ],
     )
 
     st.markdown("---")
 
-    if st.session_state.df is None:
+    if st.session_state.df is not None:
 
-        st.info(
-            "No dataset uploaded yet. "
-            "Go to **Upload Dataset** to get started."
+        st.success("Dataset Loaded")
+
+        st.caption(
+            f"Rows: {len(st.session_state.df)}"
         )
 
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.metric(
-                "Dataset",
-                "Not Loaded",
-            )
-
-        with col2:
-            st.metric(
-                "Rows",
-                "0",
-            )
-
-        with col3:
-            st.metric(
-                "Columns",
-                "0",
-            )
-
-        with col4:
-            st.metric(
-                "Model",
-                "Not Trained",
-            )
+        st.caption(
+            f"Columns: {len(st.session_state.df.columns)}"
+        )
 
     else:
 
+        st.warning("No Dataset")
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+if page == "🏠 Dashboard":
+
+    st.markdown(
+        '<div class="hero-title">'
+        "Machine Learning Dashboard"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="hero-subtitle">'
+        "Analyze datasets, visualize insights, train ML models "
+        "and generate predictions from one platform."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # TOP METRICS
+    # --------------------------------------------------------
+
+    if st.session_state.df is not None:
+
         df = st.session_state.df
 
-        st.success(
-            "Dataset loaded successfully."
+        total_rows = len(df)
+        total_columns = len(df.columns)
+        missing_values = int(
+            df.isnull().sum().sum()
         )
 
-        col1, col2, col3, col4 = st.columns(4)
+        if st.session_state.model is not None:
+            model_status = "Trained"
+        else:
+            model_status = "Not Trained"
 
-        with col1:
-            st.metric(
-                "Rows",
-                df.shape[0],
-            )
+    else:
 
-        with col2:
-            st.metric(
-                "Columns",
-                df.shape[1],
-            )
+        total_rows = 0
+        total_columns = 0
+        missing_values = 0
+        model_status = "Not Trained"
 
-        with col3:
-            st.metric(
-                "Missing Values",
-                int(df.isnull().sum().sum()),
-            )
+    c1, c2, c3, c4 = st.columns(4)
 
-        with col4:
+    with c1:
 
-            if st.session_state.model is not None:
-                st.metric(
-                    "Model",
-                    st.session_state.model_name,
-                )
-            else:
-                st.metric(
-                    "Model",
-                    "Not Trained",
-                )
-
-        st.markdown("---")
-
-        st.subheader("📋 Dataset Preview")
-
-        st.dataframe(
-            df.head(10),
-            use_container_width=True,
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="card-icon">📄</div>
+                <div class="card-label">Dataset Rows</div>
+                <div class="card-value">
+                    {total_rows:,}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        st.subheader("📌 Dataset Information")
+    with c2:
 
-        col1, col2 = st.columns(2)
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="card-icon">📊</div>
+                <div class="card-label">Features</div>
+                <div class="card-value">
+                    {total_columns}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        with col1:
-            st.write("**Rows:**", df.shape[0])
-            st.write("**Columns:**", df.shape[1])
+    with c3:
 
-        with col2:
-            st.write(
-                "**Duplicate Rows:**",
-                int(df.duplicated().sum()),
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="card-icon">⚠️</div>
+                <div class="card-label">Missing Values</div>
+                <div class="card-value">
+                    {missing_values}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c4:
+
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+                <div class="card-icon">🤖</div>
+                <div class="card-label">Model Status</div>
+                <div class="card-value"
+                     style="font-size:21px;">
+                    {model_status}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<div class="section-title">'
+        "🚀 Machine Learning Workflow"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+
+        st.markdown(
+            """
+            <div class="info-card">
+                <h3>📂 Upload Data</h3>
+                <p>
+                Upload your CSV dataset and instantly
+                inspect rows, columns, data types and
+                missing values.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c2:
+
+        st.markdown(
+            """
+            <div class="info-card">
+                <h3>📊 Explore Data</h3>
+                <p>
+                Understand your data using statistics,
+                charts, distributions, correlations
+                and data-quality analysis.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c3:
+
+        st.markdown(
+            """
+            <div class="info-card">
+                <h3>🤖 Build Model</h3>
+                <p>
+                Train classification or regression
+                models and evaluate their performance
+                using machine learning metrics.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<div class="section-title">'
+        "📌 Platform Features"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    features = [
+        "CSV Dataset Upload",
+        "Data Preview",
+        "Missing Value Analysis",
+        "Statistical Analysis",
+        "Interactive Visualizations",
+        "Classification Models",
+        "Regression Models",
+        "Model Evaluation",
+        "Prediction",
+        "Model Download",
+    ]
+
+    cols = st.columns(5)
+
+    for i, feature in enumerate(features):
+
+        with cols[i % 5]:
+
+            st.markdown(
+                f"""
+                <div style="
+                    background:white;
+                    border:1px solid #e5e7eb;
+                    border-radius:10px;
+                    padding:12px;
+                    margin-bottom:10px;
+                    font-size:13px;
+                    font-weight:600;">
+                    ✓ {feature}
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            st.write(
-                "**Missing Values:**",
-                int(df.isnull().sum().sum()),
-            )
 
 
-# =========================================================
+# ============================================================
 # UPLOAD DATASET
-# =========================================================
+# ============================================================
 
 elif page == "📂 Upload Dataset":
 
-    st.title("📂 Upload Dataset")
+    st.markdown(
+        '<div class="hero-title">'
+        "Upload Dataset"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-    st.write(
-        "Upload a CSV file to start your machine learning workflow."
+    st.markdown(
+        '<div class="hero-subtitle">'
+        "Import your CSV dataset and prepare it for analysis."
+        "</div>",
+        unsafe_allow_html=True,
     )
 
     uploaded_file = st.file_uploader(
-        "Choose CSV file",
+        "Drop your CSV file here",
         type=["csv"],
+        help="Only CSV files are supported.",
     )
 
     if uploaded_file is not None:
@@ -469,72 +695,116 @@ elif page == "📂 Upload Dataset":
 
             st.session_state.df = df
 
-            # Reset model when new dataset is uploaded
-            st.session_state.model = None
-            st.session_state.model_pipeline = None
-            st.session_state.target_column = None
-            st.session_state.feature_columns = []
-            st.session_state.task_type = None
-            st.session_state.model_name = None
-            st.session_state.label_encoder = None
-            st.session_state.training_results = None
+            reset_model()
 
             st.success(
                 "Dataset uploaded successfully!"
             )
 
-            st.markdown("---")
+            st.markdown(
+                '<div class="section-title">'
+                "Dataset Summary"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
-            col1, col2, col3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
 
-            with col1:
+            with c1:
                 st.metric(
                     "Rows",
-                    df.shape[0],
+                    f"{len(df):,}",
                 )
 
-            with col2:
+            with c2:
                 st.metric(
                     "Columns",
-                    df.shape[1],
+                    len(df.columns),
                 )
 
-            with col3:
+            with c3:
                 st.metric(
-                    "Missing Values",
-                    int(df.isnull().sum().sum()),
+                    "Missing",
+                    int(
+                        df.isnull()
+                        .sum()
+                        .sum()
+                    ),
                 )
 
-            st.subheader(
-                "📋 Dataset Preview"
+            with c4:
+                st.metric(
+                    "Duplicates",
+                    int(
+                        df.duplicated()
+                        .sum()
+                    ),
+                )
+
+            st.markdown(
+                '<div class="section-title">'
+                "Dataset Preview"
+                "</div>",
+                unsafe_allow_html=True,
             )
 
             st.dataframe(
-                df.head(20),
+                df.head(15),
                 use_container_width=True,
+                height=420,
             )
 
+            csv_data = df.to_csv(
+                index=False
+            ).encode("utf-8")
+
             st.download_button(
-                label="⬇️ Download Uploaded Dataset",
-                data=dataframe_download(df),
-                file_name="uploaded_dataset.csv",
+                "⬇️ Download Dataset",
+                data=csv_data,
+                file_name="dataset.csv",
                 mime="text/csv",
             )
 
         except Exception as e:
 
             st.error(
-                f"Could not read the CSV file: {e}"
+                f"Unable to read dataset: {e}"
             )
 
+    else:
 
-# =========================================================
+        st.markdown(
+            """
+            <div style="
+                background:white;
+                border:1px dashed #94a3b8;
+                border-radius:14px;
+                padding:35px;
+                text-align:center;
+                margin-top:15px;">
+                <div style="font-size:45px;">📁</div>
+                <h3>Upload your CSV dataset</h3>
+                <p style="color:#6b7280;">
+                    Supported format: CSV
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
 # DATA ANALYSIS
-# =========================================================
+# ============================================================
 
 elif page == "📊 Data Analysis":
 
-    st.title("📊 Data Analysis")
+    st.markdown(
+        '<div class="hero-title">'
+        "Data Analysis"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.df is None:
 
@@ -549,15 +819,15 @@ elif page == "📊 Data Analysis":
         tab1, tab2, tab3, tab4 = st.tabs(
             [
                 "📋 Overview",
-                "🔎 Statistics",
-                "📈 Visualizations",
+                "📈 Statistics",
+                "📊 Visualizations",
                 "🧹 Data Quality",
             ]
         )
 
-        # -------------------------------------------------
+        # ====================================================
         # OVERVIEW
-        # -------------------------------------------------
+        # ====================================================
 
         with tab1:
 
@@ -568,42 +838,43 @@ elif page == "📊 Data Analysis":
             st.dataframe(
                 df,
                 use_container_width=True,
+                height=430,
             )
 
             st.subheader(
                 "Column Information"
             )
 
-            column_info = pd.DataFrame(
+            info_df = pd.DataFrame(
                 {
                     "Column": df.columns,
-                    "Data Type": [
-                        str(dtype)
-                        for dtype in df.dtypes
+                    "Type": [
+                        str(x)
+                        for x in df.dtypes
                     ],
                     "Non-Null": [
-                        df[col].notna().sum()
-                        for col in df.columns
-                    ],
-                    "Unique Values": [
-                        df[col].nunique()
-                        for col in df.columns
+                        df[c].notna().sum()
+                        for c in df.columns
                     ],
                     "Missing": [
-                        df[col].isnull().sum()
-                        for col in df.columns
+                        df[c].isna().sum()
+                        for c in df.columns
+                    ],
+                    "Unique": [
+                        df[c].nunique()
+                        for c in df.columns
                     ],
                 }
             )
 
             st.dataframe(
-                column_info,
+                info_df,
                 use_container_width=True,
             )
 
-        # -------------------------------------------------
+        # ====================================================
         # STATISTICS
-        # -------------------------------------------------
+        # ====================================================
 
         with tab2:
 
@@ -618,26 +889,26 @@ elif page == "📊 Data Analysis":
                 use_container_width=True,
             )
 
-        # -------------------------------------------------
+        # ====================================================
         # VISUALIZATIONS
-        # -------------------------------------------------
+        # ====================================================
 
         with tab3:
 
-            st.subheader(
-                "📈 Data Visualization"
-            )
-
-            numeric_columns = df.select_dtypes(
+            numeric_cols = df.select_dtypes(
                 include=np.number
             ).columns.tolist()
 
-            categorical_columns = df.select_dtypes(
-                include=["object", "category", "bool"]
+            categorical_cols = df.select_dtypes(
+                include=[
+                    "object",
+                    "category",
+                    "bool",
+                ]
             ).columns.tolist()
 
             chart_type = st.selectbox(
-                "Select Chart",
+                "Choose visualization",
                 [
                     "Histogram",
                     "Bar Chart",
@@ -648,26 +919,24 @@ elif page == "📊 Data Analysis":
                 ],
             )
 
-            # Histogram
+            # ------------------------------------------------
+            # HISTOGRAM
+            # ------------------------------------------------
+
             if chart_type == "Histogram":
 
-                if not numeric_columns:
-
-                    st.warning(
-                        "No numeric columns available."
-                    )
-
-                else:
+                if numeric_cols:
 
                     column = st.selectbox(
-                        "Select numeric column",
-                        numeric_columns,
+                        "Numeric column",
+                        numeric_cols,
                     )
 
                     fig = px.histogram(
                         df,
                         x=column,
                         title=f"Distribution of {column}",
+                        marginal="box",
                     )
 
                     st.plotly_chart(
@@ -675,20 +944,23 @@ elif page == "📊 Data Analysis":
                         use_container_width=True,
                     )
 
-            # Bar chart
-            elif chart_type == "Bar Chart":
-
-                if not categorical_columns:
-
-                    st.warning(
-                        "No categorical columns available."
-                    )
-
                 else:
 
+                    st.info(
+                        "No numeric columns available."
+                    )
+
+            # ------------------------------------------------
+            # BAR
+            # ------------------------------------------------
+
+            elif chart_type == "Bar Chart":
+
+                if categorical_cols:
+
                     column = st.selectbox(
-                        "Select categorical column",
-                        categorical_columns,
+                        "Category column",
+                        categorical_cols,
                     )
 
                     counts = (
@@ -707,7 +979,7 @@ elif page == "📊 Data Analysis":
                         counts,
                         x="Category",
                         y="Count",
-                        title=f"Distribution of {column}",
+                        title=f"{column} Distribution",
                     )
 
                     st.plotly_chart(
@@ -715,35 +987,43 @@ elif page == "📊 Data Analysis":
                         use_container_width=True,
                     )
 
-            # Scatter plot
-            elif chart_type == "Scatter Plot":
-
-                if len(numeric_columns) < 2:
-
-                    st.warning(
-                        "At least two numeric columns are required."
-                    )
-
                 else:
 
-                    x_column = st.selectbox(
-                        "X Axis",
-                        numeric_columns,
+                    st.info(
+                        "No categorical columns available."
                     )
 
-                    y_column = st.selectbox(
-                        "Y Axis",
-                        numeric_columns,
-                        index=1
-                        if len(numeric_columns) > 1
-                        else 0,
-                    )
+            # ------------------------------------------------
+            # SCATTER
+            # ------------------------------------------------
+
+            elif chart_type == "Scatter Plot":
+
+                if len(numeric_cols) >= 2:
+
+                    c1, c2 = st.columns(2)
+
+                    with c1:
+
+                        x_col = st.selectbox(
+                            "X Axis",
+                            numeric_cols,
+                        )
+
+                    with c2:
+
+                        y_col = st.selectbox(
+                            "Y Axis",
+                            numeric_cols,
+                            index=1,
+                        )
 
                     fig = px.scatter(
                         df,
-                        x=x_column,
-                        y=y_column,
-                        title=f"{x_column} vs {y_column}",
+                        x=x_col,
+                        y=y_col,
+                        title=f"{x_col} vs {y_col}",
+                        trendline=None,
                     )
 
                     st.plotly_chart(
@@ -751,35 +1031,36 @@ elif page == "📊 Data Analysis":
                         use_container_width=True,
                     )
 
-            # Line chart
-            elif chart_type == "Line Chart":
+                else:
 
-                if len(numeric_columns) < 2:
-
-                    st.warning(
+                    st.info(
                         "At least two numeric columns are required."
                     )
 
-                else:
+            # ------------------------------------------------
+            # LINE
+            # ------------------------------------------------
 
-                    x_column = st.selectbox(
+            elif chart_type == "Line Chart":
+
+                if len(numeric_cols) >= 2:
+
+                    x_col = st.selectbox(
                         "X Axis",
-                        numeric_columns,
+                        numeric_cols,
                     )
 
-                    y_column = st.selectbox(
+                    y_col = st.selectbox(
                         "Y Axis",
-                        numeric_columns,
-                        index=1
-                        if len(numeric_columns) > 1
-                        else 0,
+                        numeric_cols,
+                        index=1,
                     )
 
                     fig = px.line(
                         df,
-                        x=x_column,
-                        y=y_column,
-                        title=f"{y_column} over {x_column}",
+                        x=x_col,
+                        y=y_col,
+                        title=f"{y_col} over {x_col}",
                     )
 
                     st.plotly_chart(
@@ -787,20 +1068,23 @@ elif page == "📊 Data Analysis":
                         use_container_width=True,
                     )
 
-            # Pie chart
-            elif chart_type == "Pie Chart":
-
-                if not categorical_columns:
-
-                    st.warning(
-                        "No categorical columns available."
-                    )
-
                 else:
 
+                    st.info(
+                        "At least two numeric columns are required."
+                    )
+
+            # ------------------------------------------------
+            # PIE
+            # ------------------------------------------------
+
+            elif chart_type == "Pie Chart":
+
+                if categorical_cols:
+
                     column = st.selectbox(
-                        "Select categorical column",
-                        categorical_columns,
+                        "Category",
+                        categorical_cols,
                     )
 
                     counts = (
@@ -820,41 +1104,48 @@ elif page == "📊 Data Analysis":
                         names="Category",
                         values="Count",
                         title=f"{column} Distribution",
+                        hole=0.35,
                     )
 
                     st.plotly_chart(
                         fig,
                         use_container_width=True,
-                    )
-
-            # Correlation
-            elif chart_type == "Correlation Heatmap":
-
-                if len(numeric_columns) < 2:
-
-                    st.warning(
-                        "At least two numeric columns are required."
                     )
 
                 else:
 
-                    correlation = df[
-                        numeric_columns
+                    st.info(
+                        "No categorical columns available."
+                    )
+
+            # ------------------------------------------------
+            # CORRELATION
+            # ------------------------------------------------
+
+            elif chart_type == "Correlation Heatmap":
+
+                if len(numeric_cols) >= 2:
+
+                    corr = df[
+                        numeric_cols
                     ].corr()
 
                     fig = go.Figure(
-                        data=go.Heatmap(
-                            z=correlation.values,
-                            x=correlation.columns,
-                            y=correlation.columns,
-                            colorscale="Viridis",
-                            zmin=-1,
-                            zmax=1,
-                        )
+                        data=[
+                            go.Heatmap(
+                                z=corr.values,
+                                x=corr.columns,
+                                y=corr.columns,
+                                colorscale="Viridis",
+                                zmin=-1,
+                                zmax=1,
+                            )
+                        ]
                     )
 
                     fig.update_layout(
-                        title="Correlation Heatmap"
+                        title="Feature Correlation",
+                        height=600,
                     )
 
                     st.plotly_chart(
@@ -862,29 +1153,36 @@ elif page == "📊 Data Analysis":
                         use_container_width=True,
                     )
 
-        # -------------------------------------------------
+                else:
+
+                    st.info(
+                        "At least two numeric columns are required."
+                    )
+
+        # ====================================================
         # DATA QUALITY
-        # -------------------------------------------------
+        # ====================================================
 
         with tab4:
 
             st.subheader(
-                "🧹 Missing Values"
+                "Missing Values"
             )
 
             missing_df = pd.DataFrame(
                 {
                     "Column": df.columns,
-                    "Missing Values": [
-                        df[col].isnull().sum()
-                        for col in df.columns
+                    "Missing": [
+                        df[c].isna().sum()
+                        for c in df.columns
                     ],
-                    "Missing Percentage": [
+                    "Percentage": [
                         round(
-                            df[col].isnull().mean() * 100,
+                            df[c].isna().mean()
+                            * 100,
                             2,
                         )
-                        for col in df.columns
+                        for c in df.columns
                     ],
                 }
             )
@@ -898,30 +1196,42 @@ elif page == "📊 Data Analysis":
                 "Duplicate Rows"
             )
 
-            duplicate_count = int(
+            duplicates = int(
                 df.duplicated().sum()
             )
 
-            if duplicate_count == 0:
+            if duplicates == 0:
 
                 st.success(
-                    "No duplicate rows found."
+                    "✓ No duplicate rows found."
                 )
 
             else:
 
                 st.warning(
-                    f"{duplicate_count} duplicate rows found."
+                    f"{duplicates} duplicate rows found."
                 )
 
 
-# =========================================================
+# ============================================================
 # TRAIN MODEL
-# =========================================================
+# ============================================================
 
 elif page == "🤖 Train Model":
 
-    st.title("🤖 Train Machine Learning Model")
+    st.markdown(
+        '<div class="hero-title">'
+        "Train Machine Learning Model"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="hero-subtitle">'
+        "Configure, train and evaluate your machine learning model."
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.df is None:
 
@@ -933,12 +1243,15 @@ elif page == "🤖 Train Model":
 
         df = st.session_state.df.copy()
 
-        st.subheader(
-            "1️⃣ Select Target Column"
+        st.markdown(
+            '<div class="section-title">'
+            "1. Model Configuration"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
         target_column = st.selectbox(
-            "Target column",
+            "Select Target Column",
             df.columns,
         )
 
@@ -951,13 +1264,13 @@ elif page == "🤖 Train Model":
         if X.shape[1] == 0:
 
             st.error(
-                "Your dataset must have at least one feature column."
+                "At least one feature column is required."
             )
 
         elif y.nunique() < 2:
 
             st.error(
-                "Target column must contain at least two different values."
+                "Target column must contain at least two unique values."
             )
 
         else:
@@ -965,23 +1278,25 @@ elif page == "🤖 Train Model":
             detected_task = detect_task(y)
 
             st.info(
-                f"Automatically detected task: **{detected_task}**"
+                f"Detected problem type: **{detected_task}**"
             )
 
             task_type = st.selectbox(
-                "Machine Learning Task",
+                "Problem Type",
                 [
                     "Classification",
                     "Regression",
                 ],
-                index=0
-                if detected_task == "Classification"
-                else 1,
+                index=(
+                    0
+                    if detected_task == "Classification"
+                    else 1
+                ),
             )
 
             if task_type == "Classification":
 
-                model_options = [
+                models = [
                     "Logistic Regression",
                     "Decision Tree",
                     "Random Forest",
@@ -989,94 +1304,102 @@ elif page == "🤖 Train Model":
 
             else:
 
-                model_options = [
+                models = [
                     "Linear Regression",
                     "Decision Tree",
                     "Random Forest",
                 ]
 
             model_name = st.selectbox(
-                "Select Model",
-                model_options,
+                "Choose Algorithm",
+                models,
             )
 
-            test_size = st.slider(
-                "Test Size",
-                min_value=0.10,
-                max_value=0.40,
-                value=0.20,
-                step=0.05,
+            c1, c2 = st.columns(2)
+
+            with c1:
+
+                test_size = st.slider(
+                    "Test Data Percentage",
+                    10,
+                    40,
+                    20,
+                )
+
+            with c2:
+
+                random_state = st.number_input(
+                    "Random State",
+                    min_value=1,
+                    max_value=9999,
+                    value=42,
+                )
+
+            st.markdown(
+                '<div class="section-title">'
+                "2. Dataset Information"
+                "</div>",
+                unsafe_allow_html=True,
             )
 
-            random_state = st.number_input(
-                "Random State",
-                min_value=1,
-                max_value=1000,
-                value=42,
-                step=1,
-            )
+            c1, c2, c3 = st.columns(3)
 
-            st.markdown("---")
+            with c1:
 
-            st.subheader(
-                "2️⃣ Dataset Summary"
-            )
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
                 st.metric(
                     "Samples",
-                    len(df),
+                    f"{len(df):,}",
                 )
 
-            with col2:
+            with c2:
+
                 st.metric(
                     "Features",
-                    X.shape[1],
+                    len(X.columns),
                 )
 
-            with col3:
+            with c3:
+
                 st.metric(
-                    "Target Classes",
+                    "Target Values",
                     y.nunique(),
                 )
 
             st.markdown("---")
 
-            train_button = st.button(
+            if st.button(
                 "🚀 Train Model",
                 type="primary",
                 use_container_width=True,
-            )
-
-            if train_button:
+            ):
 
                 try:
 
-                    # Prepare target
-                    y_prepared, label_encoder = prepare_target(
+                    y_prepared, encoder = prepare_target(
                         y
                     )
 
-                    # Split data
-                    X_train, X_test, y_train, y_test = train_test_split(
-                        X,
-                        y_prepared,
-                        test_size=test_size,
-                        random_state=int(random_state),
-                        stratify=y_prepared
-                        if task_type == "Classification"
-                        and len(np.unique(y_prepared)) > 1
-                        else None,
+                    X_train, X_test, y_train, y_test = (
+                        train_test_split(
+                            X,
+                            y_prepared,
+                            test_size=test_size / 100,
+                            random_state=int(
+                                random_state
+                            ),
+                            stratify=(
+                                y_prepared
+                                if task_type
+                                == "Classification"
+                                else None
+                            ),
+                        )
                     )
 
-                    # Preprocessor
                     preprocessor = create_preprocessor(
                         X_train
                     )
 
-                    # Model
                     model = get_model(
                         task_type,
                         model_name,
@@ -1085,13 +1408,13 @@ elif page == "🤖 Train Model":
                     if model is None:
 
                         st.error(
-                            "Unable to create selected model."
+                            "Model could not be created."
                         )
 
                     else:
 
                         pipeline = Pipeline(
-                            steps=[
+                            [
                                 (
                                     "preprocessor",
                                     preprocessor,
@@ -1104,7 +1427,7 @@ elif page == "🤖 Train Model":
                         )
 
                         with st.spinner(
-                            "Training model..."
+                            "Training your model..."
                         ):
 
                             pipeline.fit(
@@ -1112,57 +1435,69 @@ elif page == "🤖 Train Model":
                                 y_train,
                             )
 
-                        # Predictions
-                        y_pred = pipeline.predict(
+                        predictions = pipeline.predict(
                             X_test
                         )
 
+                        # Save state
                         st.session_state.model = model
                         st.session_state.model_pipeline = pipeline
                         st.session_state.target_column = target_column
                         st.session_state.feature_columns = X.columns.tolist()
                         st.session_state.task_type = task_type
                         st.session_state.model_name = model_name
-                        st.session_state.label_encoder = label_encoder
+                        st.session_state.label_encoder = encoder
 
                         st.session_state.training_results = {
-                            "X_test": X_test,
                             "y_test": y_test,
-                            "y_pred": y_pred,
+                            "predictions": predictions,
+                            "X_test": X_test,
                         }
 
                         st.success(
-                            f"{model_name} trained successfully!"
+                            f"✓ {model_name} trained successfully!"
                         )
 
-                        # -------------------------------------------------
-                        # CLASSIFICATION METRICS
-                        # -------------------------------------------------
+                        # =================================================
+                        # CLASSIFICATION
+                        # =================================================
 
                         if task_type == "Classification":
 
                             accuracy = accuracy_score(
                                 y_test,
-                                y_pred,
+                                predictions,
                             )
 
-                            st.subheader(
-                                "📊 Classification Results"
+                            st.session_state.accuracy = accuracy
+
+                            st.markdown(
+                                '<div class="section-title">'
+                                "Model Performance"
+                                "</div>",
+                                unsafe_allow_html=True,
                             )
 
-                            col1, col2 = st.columns(2)
+                            c1, c2, c3 = st.columns(3)
 
-                            with col1:
+                            with c1:
 
                                 st.metric(
                                     "Accuracy",
                                     f"{accuracy * 100:.2f}%",
                                 )
 
-                            with col2:
+                            with c2:
 
                                 st.metric(
-                                    "Test Samples",
+                                    "Training Samples",
+                                    len(y_train),
+                                )
+
+                            with c3:
+
+                                st.metric(
+                                    "Testing Samples",
                                     len(y_test),
                                 )
 
@@ -1172,7 +1507,7 @@ elif page == "🤖 Train Model":
 
                             report = classification_report(
                                 y_test,
-                                y_pred,
+                                predictions,
                                 output_dict=True,
                                 zero_division=0,
                             )
@@ -1192,21 +1527,17 @@ elif page == "🤖 Train Model":
 
                             cm = confusion_matrix(
                                 y_test,
-                                y_pred,
+                                predictions,
                             )
 
-                            fig = go.Figure(
-                                data=go.Heatmap(
-                                    z=cm,
-                                    colorscale="Blues",
-                                    text=cm,
-                                    texttemplate="%{text}",
-                                )
-                            )
-
-                            fig.update_layout(
-                                xaxis_title="Predicted",
-                                yaxis_title="Actual",
+                            fig = px.imshow(
+                                cm,
+                                text_auto=True,
+                                title="Confusion Matrix",
+                                labels={
+                                    "x": "Predicted",
+                                    "y": "Actual",
+                                },
                             )
 
                             st.plotly_chart(
@@ -1214,65 +1545,73 @@ elif page == "🤖 Train Model":
                                 use_container_width=True,
                             )
 
-                        # -------------------------------------------------
-                        # REGRESSION METRICS
-                        # -------------------------------------------------
+                        # =================================================
+                        # REGRESSION
+                        # =================================================
 
                         else:
 
                             mae = mean_absolute_error(
                                 y_test,
-                                y_pred,
+                                predictions,
                             )
 
                             mse = mean_squared_error(
                                 y_test,
-                                y_pred,
+                                predictions,
                             )
 
-                            rmse = np.sqrt(
-                                mse
-                            )
+                            rmse = np.sqrt(mse)
 
                             r2 = r2_score(
                                 y_test,
-                                y_pred,
+                                predictions,
                             )
 
-                            st.subheader(
-                                "📊 Regression Results"
+                            st.session_state.metrics = {
+                                "MAE": mae,
+                                "MSE": mse,
+                                "RMSE": rmse,
+                                "R2": r2,
+                            }
+
+                            st.markdown(
+                                '<div class="section-title">'
+                                "Model Performance"
+                                "</div>",
+                                unsafe_allow_html=True,
                             )
 
-                            col1, col2, col3, col4 = st.columns(4)
+                            c1, c2, c3, c4 = st.columns(4)
 
-                            with col1:
+                            with c1:
                                 st.metric(
                                     "MAE",
-                                    f"{mae:.4f}",
+                                    f"{mae:.3f}",
                                 )
 
-                            with col2:
+                            with c2:
                                 st.metric(
                                     "MSE",
-                                    f"{mse:.4f}",
+                                    f"{mse:.3f}",
                                 )
 
-                            with col3:
+                            with c3:
                                 st.metric(
                                     "RMSE",
-                                    f"{rmse:.4f}",
+                                    f"{rmse:.3f}",
                                 )
 
-                            with col4:
+                            with c4:
                                 st.metric(
-                                    "R² Score",
-                                    f"{r2:.4f}",
+                                    "R²",
+                                    f"{r2:.3f}",
                                 )
 
-                            results_df = pd.DataFrame(
+                            results = pd.DataFrame(
                                 {
                                     "Actual": y_test,
-                                    "Predicted": y_pred,
+                                    "Predicted": predictions,
                                 }
                             )
 
@@ -1281,40 +1620,15 @@ elif page == "🤖 Train Model":
                             )
 
                             st.dataframe(
-                                results_df.head(20),
+                                results.head(20),
                                 use_container_width=True,
                             )
 
                             fig = px.scatter(
-                                results_df,
+                                results,
                                 x="Actual",
                                 y="Predicted",
-                                title="Actual vs Predicted Values",
-                            )
-
-                            min_value = min(
-                                results_df["Actual"].min(),
-                                results_df["Predicted"].min(),
-                            )
-
-                            max_value = max(
-                                results_df["Actual"].max(),
-                                results_df["Predicted"].max(),
-                            )
-
-                            fig.add_trace(
-                                go.Scatter(
-                                    x=[
-                                        min_value,
-                                        max_value,
-                                    ],
-                                    y=[
-                                        min_value,
-                                        max_value,
-                                    ],
-                                    mode="lines",
-                                    name="Perfect Prediction",
-                                )
+                                title="Actual vs Predicted",
                             )
 
                             st.plotly_chart(
@@ -1322,9 +1636,9 @@ elif page == "🤖 Train Model":
                                 use_container_width=True,
                             )
 
-                        # -------------------------------------------------
+                        # =================================================
                         # SAVE MODEL
-                        # -------------------------------------------------
+                        # =================================================
 
                         os.makedirs(
                             "models",
@@ -1337,7 +1651,7 @@ elif page == "🤖 Train Model":
                             "feature_columns": X.columns.tolist(),
                             "task_type": task_type,
                             "model_name": model_name,
-                            "label_encoder": label_encoder,
+                            "label_encoder": encoder,
                         }
 
                         model_path = os.path.join(
@@ -1350,11 +1664,6 @@ elif page == "🤖 Train Model":
                             model_path,
                         )
 
-                        st.success(
-                            "Model saved successfully."
-                        )
-
-                        # Download model
                         model_buffer = io.BytesIO()
 
                         joblib.dump(
@@ -1365,97 +1674,123 @@ elif page == "🤖 Train Model":
                         model_buffer.seek(0)
 
                         st.download_button(
-                            label="⬇️ Download Trained Model",
+                            "⬇️ Download Trained Model",
                             data=model_buffer,
                             file_name="model.pkl",
                             mime="application/octet-stream",
+                            use_container_width=True,
                         )
 
                 except Exception as e:
 
                     st.error(
-                        f"Model training failed: {e}"
+                        f"Training failed: {e}"
                     )
 
 
-# =========================================================
+# ============================================================
 # PREDICTION
-# =========================================================
+# ============================================================
 
 elif page == "🔮 Prediction":
 
-    st.title("🔮 Make Prediction")
+    st.markdown(
+        '<div class="hero-title">'
+        "Make Prediction"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="hero-subtitle">'
+        "Enter feature values and generate a machine learning prediction."
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.model_pipeline is None:
 
         st.warning(
-            "Please train a model first."
+            "No trained model found."
+        )
+
+        st.info(
+            "Go to **Train Model** and train a model first."
         )
 
     else:
 
         pipeline = st.session_state.model_pipeline
 
-        target_column = st.session_state.target_column
-
-        feature_columns = st.session_state.feature_columns
+        feature_columns = (
+            st.session_state.feature_columns
+        )
 
         task_type = st.session_state.task_type
-
         model_name = st.session_state.model_name
-
+        target_column = st.session_state.target_column
         df = st.session_state.df
 
-        st.success(
-            f"Using model: **{model_name}**"
-        )
+        c1, c2, c3 = st.columns(3)
 
-        st.write(
-            f"Task: **{task_type}**"
-        )
+        with c1:
 
-        st.write(
-            f"Target: **{target_column}**"
-        )
+            st.metric(
+                "Model",
+                model_name,
+            )
 
-        st.markdown("---")
+        with c2:
 
-        st.subheader(
-            "Enter Feature Values"
+            st.metric(
+                "Task",
+                task_type,
+            )
+
+        with c3:
+
+            st.metric(
+                "Target",
+                target_column,
+            )
+
+        st.markdown(
+            '<div class="section-title">'
+            "Enter Input Values"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
         input_data = {}
 
-        input_columns = st.columns(2)
+        cols = st.columns(2)
 
-        for index, column in enumerate(
+        for i, column in enumerate(
             feature_columns
         ):
 
-            column_data = df[column]
+            series = df[column]
 
-            with input_columns[index % 2]:
+            with cols[i % 2]:
 
-                if (
-                    pd.api.types.is_numeric_dtype(
-                        column_data
-                    )
+                if pd.api.types.is_numeric_dtype(
+                    series
                 ):
 
-                    median_value = column_data.median()
+                    default = series.median()
 
-                    if pd.isna(median_value):
-                        median_value = 0
+                    if pd.isna(default):
+                        default = 0
 
                     input_data[column] = st.number_input(
                         column,
-                        value=float(median_value),
+                        value=float(default),
                     )
 
                 else:
 
                     values = (
-                        column_data
+                        series
                         .dropna()
                         .astype(str)
                         .unique()
@@ -1477,13 +1812,11 @@ elif page == "🔮 Prediction":
 
         st.markdown("---")
 
-        predict_button = st.button(
-            "🔮 Predict",
+        if st.button(
+            "🔮 Generate Prediction",
             type="primary",
             use_container_width=True,
-        )
-
-        if predict_button:
+        ):
 
             try:
 
@@ -1497,7 +1830,6 @@ elif page == "🔮 Prediction":
 
                 result = prediction[0]
 
-                # Decode classification result
                 if (
                     task_type == "Classification"
                     and st.session_state.label_encoder
@@ -1515,30 +1847,50 @@ elif page == "🔮 Prediction":
                         )[0]
 
                     except Exception:
-
                         result = str(result)
 
-                st.success(
-                    f"Prediction: **{result}**"
+                st.markdown(
+                    f"""
+                    <div style="
+                        background:white;
+                        border:1px solid #d1d5db;
+                        border-radius:16px;
+                        padding:30px;
+                        text-align:center;
+                        margin-top:20px;">
+                        <div style="
+                            font-size:16px;
+                            color:#6b7280;">
+                            Prediction Result
+                        </div>
+                        <div style="
+                            font-size:42px;
+                            font-weight:800;
+                            color:#111827;
+                            margin-top:10px;">
+                            {result}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
 
-                st.subheader(
-                    "Prediction Details"
+                st.markdown(
+                    '<div class="section-title">'
+                    "Input Summary"
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
 
-                result_df = pd.DataFrame(
+                input_display = pd.DataFrame(
                     {
-                        "Feature": list(
-                            input_data.keys()
-                        ),
-                        "Value": list(
-                            input_data.values()
-                        ),
+                        "Feature": input_data.keys(),
+                        "Value": input_data.values(),
                     }
                 )
 
                 st.dataframe(
-                    result_df,
+                    input_display,
                     use_container_width=True,
                 )
 
@@ -1549,13 +1901,17 @@ elif page == "🔮 Prediction":
                 )
 
 
-# =========================================================
+# ============================================================
 # FOOTER
-# =========================================================
+# ============================================================
 
-st.markdown("---")
-
-st.caption(
-    "🤖 ML Data App | Built with Python, "
-    "Streamlit, Pandas, Scikit-learn and Plotly"
+st.markdown(
+    """
+    <div class="footer">
+        🤖 ML Data Intelligence Platform
+        <br>
+        Built with Python • Streamlit • Pandas • Scikit-learn • Plotly
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
